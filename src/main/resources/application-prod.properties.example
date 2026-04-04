@@ -1,0 +1,15 @@
+spring.datasource.url=${DB_URL}
+spring.datasource.username=${DB_USER}
+spring.datasource.password=${DB_PASS}
+
+spring.datasource.hikari.maximum-pool-size=10
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=false
+spring.jpa.open-in-view=false
+
+logging.level.root=WARN
+logging.level.com.klassenbuch=INFO
+
+# Swagger disabled in production
+springdoc.swagger-ui.enabled=false
+springdoc.api-docs.enabled=false
