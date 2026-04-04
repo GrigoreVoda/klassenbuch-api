@@ -56,7 +56,6 @@ Falls nicht, Schema anlegen:
 ```bash
 curl -o init_db.sql \
   https://raw.githubusercontent.com/GrigoreVoda/klassenbuch/main/init_db.sql.txt
-psql -U postgres -d klassenbuch -f init_db.sql
 ```
 
 ### 3. Passwort konfigurieren
