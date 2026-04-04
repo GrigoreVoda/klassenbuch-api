@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    container_name: klassenbuch-app
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL:  jdbc:postgresql://host-gateway:5432/klassenbuch
+      DB_USER: postgres
+      DB_PASS: ${DB_PASS}
+    extra_hosts:
+      - "host-gateway:host-gateway"
