@@ -31,10 +31,19 @@ git clone https://github.com/GrigoreVoda/klassenbuch-api.git
 cd klassenbuch-api
 ```
 
-### 2. Passwort festlegen
+### 2. Passwort und Benutzer festlegen
 
+Im Projekt-Root (gleiche Ebene wie `docker-compose.full.yml`):
 ```bash
-echo "DB_PASS=dein_passwort" > .env
+touch .env
+nano .env
+```
+
+Inhalt von `.env` ausfüllen:
+```env
+DB_URL=jdbc:postgresql://localhost:5432/klassenbuch
+DB_USER=
+DB_PASS=dein_passwort
 ```
 
 ### 3. Starten
@@ -52,7 +61,7 @@ Beim ersten Start (~2 Min) passiert automatisch:
 ### 4. Prüfen
 
 ```bash
-curl http://localhost:8080/dozenten
+curl http://localhost:8080/lernfelder
 # → [] (leer, noch keine Daten)
 ```
 
@@ -60,11 +69,37 @@ Swagger UI: **http://localhost:8080/swagger-ui.html**
 
 ### 5. Daten importieren (optional)
 
+**Option A — Neue Daten aus PDFs importieren** (frische Installation):
+
+Siehe [klassenbuch projekt](https://github.com/GrigoreVoda/klassenbuch) für
+Installationsanleitung und Nutzung des PDF-Parsers.
 ```bash
 # Im klassenbuch PDF-Parser Projekt:
 python klassenbuch_pdf_parsing.py
 # Schreibt direkt in die DB auf Port 5432
 ```
+
+**Option B — Bestehenden Dump importieren** (wenn du schon Daten hast):
+```bash
+# Dump von alter PostgreSQL erstellen (auf dem alten Server):
+pg_dump -U postgres -d klassenbuch -F c -f klassenbuch_backup.dump
+
+# Dump in Docker importieren:
+docker compose -f docker-compose.full.yml exec -T db \
+  pg_restore -U postgres -d klassenbuch --no-owner \
+  < klassenbuch_backup.dump
+
+# Prüfen ob Daten da sind:
+docker compose -f docker-compose.full.yml exec db \
+  psql -U postgres -d klassenbuch \
+  -c "SELECT COUNT(*) FROM lerntag;"
+```
+
+> Falls du Fehler wie `relation already exists` siehst — das ist normal.
+> Die Tabellen wurden bereits von `init_db.sql` angelegt.
+> Die Daten werden trotzdem importiert.
+
+
 
 ### Befehle
 
