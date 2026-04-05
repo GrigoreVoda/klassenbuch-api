@@ -14,9 +14,9 @@ Built with **Java 21** · **Spring Boot 3.3** · **Spring Data JPA** · **Postgr
 
 | Situation | Empfohlene Variante |
 |-----------|-------------------|
-| Ich habe **keine PostgreSQL** auf meinem Rechner | ✅ **Variante C** — alles in Docker |
-| Ich **entwickle** und will schnellen Neustart | ✅ **Variante A** — direkt mit Maven |
+| Ich habe **keine PostgreSQL** auf meinem Rechner | ✅ **Variante A** — alles in Docker |
 | Ich habe schon eine **laufende PostgreSQL** mit Daten | ✅ **Variante B** — nur App in Docker |
+| Ich **entwickle** und will schnellen Neustart ohne Docker | ✅ **Variante C** — direkt mit Maven |
 
 ---
 
@@ -24,17 +24,17 @@ Built with **Java 21** · **Spring Boot 3.3** · **Spring Data JPA** · **Postgr
 
 | Tool | Variante A | Variante B | Variante C |
 |------|-----------|-----------|-----------|
-| Java JDK 21 | ✅ | ❌ | ❌ |
-| Maven / `./mvnw` | ✅ | ❌ | ❌ |
-| PostgreSQL (lokal) | ✅ | ✅ | ❌ |
-| Docker + Docker Compose | ❌ | ✅ | ✅ |
+| Docker + Docker Compose | ✅ | ✅ | ❌ |
+| PostgreSQL (lokal laufend) | ❌ | ✅ | ✅ |
+| Java JDK 21 | ❌ | ❌ | ✅ |
 | Git | ✅ | ✅ | ✅ |
 
 ---
 
-## Variante A — Direkt mit Maven (Entwicklung)
+## Variante A — Alles in Docker (empfohlen für Neuinstallation)
 
-Für Entwickler mit laufender lokaler PostgreSQL. Kein Docker nötig.
+**Nur Docker muss installiert sein.** PostgreSQL und App starten zusammen mit einem Befehl.
+Tabellen werden beim ersten Start automatisch angelegt.
 
 ### 1. Repository klonen
 
@@ -43,44 +43,51 @@ git clone https://github.com/GrigoreVoda/klassenbuch-api.git
 cd klassenbuch-api
 ```
 
-### 2. Datenbank prüfen
-
-```bash
-psql -U postgres -d klassenbuch -c "\dt"
-```
-
-Du solltest 5 Tabellen sehen: `dozent`, `lernfeld`, `lernfeld_dozent`, `lerntag`, `unterrichtseinheit`.
-
-Falls nicht, Schema anlegen:
+### 2. Schema-Datei herunterladen
 
 ```bash
 curl -o init_db.sql \
   https://raw.githubusercontent.com/GrigoreVoda/klassenbuch/main/init_db.sql.txt
 ```
 
-### 3. Passwort konfigurieren
+### 3. Passwort festlegen
 
 ```bash
-nano src/main/resources/application-dev.properties
+echo "DB_PASS=dein_gewaehltes_passwort" > .env
 ```
 
-Zeile anpassen:
+> `.env` steht in `.gitignore` — wird nie in Git gespeichert.
 
-```properties
-spring.datasource.password=DEIN_POSTGRES_PASSWORT
-```
-
-### 4. Starten
+### 4. Alles starten
 
 ```bash
-./mvnw spring-boot:run
+docker compose up --build -d
 ```
+
+Docker erledigt automatisch:
+- PostgreSQL-Container starten
+- Datenbank `klassenbuch` anlegen
+- Alle Tabellen aus `init_db.sql` anlegen
+- App bauen (Java + Maven im Container) und starten
+- App wartet bis die DB bereit ist
+
+Beim **ersten Start** dauert es 2–3 Minuten wegen des Maven-Downloads.
 
 ### 5. Prüfen
 
+```bash
+curl http://localhost:8080/dozenten
+# → [] (leere Liste, noch keine Daten)
 ```
-http://localhost:8080/swagger-ui.html  →  Swagger UI
-http://localhost:8080/dozenten         →  JSON-Liste der Dozenten
+
+Oder im Browser: **http://localhost:8080/swagger-ui.html** → interaktive API-Dokumentation.
+
+### 6. Daten importieren (optional)
+
+```bash
+# Im klassenbuch-Projekt (PDF-Parser):
+python klassenbuch_pdf_parsing.py
+# Der Parser schreibt direkt in die DB auf Port 5432.
 ```
 
 ---
@@ -107,7 +114,7 @@ host    klassenbuch    postgres    172.17.0.0/16    md5
 sudo nano /var/lib/pgsql/data/postgresql.conf
 ```
 
-Ändern auf:
+Zeile ändern auf:
 
 ```
 listen_addresses = '*'
@@ -120,43 +127,29 @@ sudo firewall-cmd --add-port=5432/tcp --permanent
 sudo firewall-cmd --reload
 ```
 
-### 2. Repository klonen
+### 2. docker-compose.yml anpassen
+
+Die `docker-compose.yml` enthält standardmäßig einen `db`-Service.
+Für Variante B (eigene DB) die Datei so verwenden — nur den `app`-Service starten:
 
 ```bash
-git clone https://github.com/GrigoreVoda/klassenbuch-api.git
-cd klassenbuch-api
+docker compose up --build -d app
 ```
 
-### 3. App-Container starten
+Der `app`-Service verbindet sich über `host-gateway:5432` mit der lokalen PostgreSQL.
+
+### 3. Passwort setzen und starten
 
 ```bash
-docker build -t klassenbuch-api:latest .
-
-docker run -d \
-  --name klassenbuch-api \
-  -p 8080:8080 \
-  -e SPRING_PROFILES_ACTIVE=prod \
-  -e DB_URL=jdbc:postgresql://host-gateway:5432/klassenbuch \
-  -e DB_USER=postgres \
-  -e DB_PASS=DEIN_PASSWORT \
-  --add-host host-gateway:host-gateway \
-  klassenbuch-api:latest
-```
-
-```bash
-# Logs verfolgen:
-docker logs -f klassenbuch-api
-
-# Stoppen:
-docker stop klassenbuch-api && docker rm klassenbuch-api
+echo "DB_PASS=dein_postgres_passwort" > .env
+docker compose up --build -d app
 ```
 
 ---
 
-## Variante C — Alles in Docker (Neuinstallation, empfohlen)
+## Variante C — Direkt mit Maven (Entwicklung)
 
-**Nur Docker nötig.** PostgreSQL und App starten zusammen mit einem Befehl.
-Die Tabellen werden beim ersten Start automatisch angelegt.
+Für schnelle Entwicklungszyklen ohne Docker.
 
 ### 1. Repository klonen
 
@@ -165,80 +158,104 @@ git clone https://github.com/GrigoreVoda/klassenbuch-api.git
 cd klassenbuch-api
 ```
 
-### 2. Schema-Datei herunterladen
+### 2. Datenbank prüfen
 
-Das Datenbankschema aus dem Klassenbuch-Projekt holen:
+```bash
+psql -U postgres -d klassenbuch -c "\dt"
+```
+
+Du solltest 5 Tabellen sehen. Falls nicht:
 
 ```bash
 curl -o init_db.sql \
   https://raw.githubusercontent.com/GrigoreVoda/klassenbuch/main/init_db.sql.txt
+psql -U postgres -d klassenbuch -f init_db.sql
 ```
 
-### 3. Passwort festlegen
+### 3. Passwort konfigurieren
 
 ```bash
-cp .env.template .env
-nano .env
+nano src/main/resources/application-dev.properties
 ```
 
-Inhalt von `.env`:
+Zeile anpassen:
 
-```env
-DB_PASS=dein_gewaehltes_passwort
+```properties
+spring.datasource.password=DEIN_POSTGRES_PASSWORT
 ```
 
-> `.env` steht in `.gitignore` — wird nie in Git gespeichert.
-
-### 4. Alles starten
+### 4. Starten
 
 ```bash
-docker compose up --build
+./mvnw spring-boot:run
 ```
 
-Docker macht automatisch:
-1. PostgreSQL-Container starten
-2. Datenbank `klassenbuch` anlegen
-3. Alle Tabellen aus `init_db.sql` anlegen
-4. App bauen und starten (wartet bis DB bereit ist)
+---
 
-Beim ersten Start dauert es 1–2 Minuten wegen des Maven-Downloads.
+## Code ändern und neu deployen
 
-### 5. Prüfen
-
-```
-http://localhost:8080/swagger-ui.html  →  Swagger UI
-http://localhost:8080/dozenten         →  leere Liste [] (noch keine Daten)
-```
-
-### 6. Daten importieren (optional)
-
-Um Daten aus Klassenbuch-PDFs zu importieren:
+### Nur Java-Code geändert (normal)
 
 ```bash
-# Im klassenbuch-Projekt (PDF-Parser), mit DB auf Port 5432:
-python klassenbuch_pdf_parsing.py
+# Lokal:
+git add .
+git commit -m "feat: deine Änderung"
+git push
+
+# Auf der anderen Maschine:
+git pull
+docker compose up --build -d
 ```
 
-### Nützliche Befehle für Variante C
+`--build` baut das App-Image neu. Die Datenbank wird nicht angefasst.
+
+### Neue Dependency in pom.xml hinzugefügt
+
+Gleicher Prozess — `--build` reicht. Docker erkennt die geänderte `pom.xml`
+und lädt neue JARs herunter.
+
+### Datenbankschema geändert (neue Spalte, neue Tabelle)
+
+Spring startet nicht wenn Entity und DB-Schema nicht übereinstimmen
+(`ddl-auto=validate`). Deshalb muss die DB manuell angepasst werden:
 
 ```bash
-# Starten im Hintergrund:
-docker compose up -d --build
+# Variante A (DB in Docker):
+docker compose exec db psql -U postgres -d klassenbuch \
+  -c "ALTER TABLE lerntag ADD COLUMN raum VARCHAR(20);"
 
-# Logs der App:
-docker compose logs -f app
+# Variante B/C (DB auf Host):
+psql -U postgres -d klassenbuch \
+  -c "ALTER TABLE lerntag ADD COLUMN raum VARCHAR(20);"
 
-# Logs der Datenbank:
-docker compose logs -f db
+# Danach App neu starten:
+git pull
+docker compose up --build -d
+```
 
-# Status prüfen:
+---
+
+## Nützliche Befehle
+
+```bash
+# Status aller Container:
 docker compose ps
 
-# Stoppen (Daten bleiben erhalten):
+# Logs der App verfolgen:
+docker compose logs -f app
+
+# Logs der Datenbank verfolgen:
+docker compose logs -f db
+
+# App neu starten (ohne Rebuild):
+docker compose restart app
+
+# Alles stoppen (Daten bleiben erhalten):
 docker compose down
 
-# Kompletter Reset — Daten werden GELÖSCHT:
+# Komplett zurücksetzen — ALLE DATEN WERDEN GELÖSCHT:
 docker compose down -v
+docker compose up --build -d
 ```
 
 ---
@@ -293,8 +310,6 @@ Vollständige interaktive Dokumentation: **http://localhost:8080/swagger-ui.html
 
 ### Fehlerantworten
 
-Alle Fehler liefern einheitliches JSON:
-
 ```json
 {
   "timestamp": "2024-09-04T10:15:30Z",
@@ -304,7 +319,7 @@ Alle Fehler liefern einheitliches JSON:
 }
 ```
 
-Validierungsfehler:
+Validierungsfehler enthalten alle fehlerhaften Felder:
 
 ```json
 {
@@ -332,9 +347,9 @@ klassenbuch-api/
 │   ├── application.properties          ← Gemeinsame Einstellungen
 │   ├── application-dev.properties      ← Entwicklung (lokale DB)
 │   └── application-prod.properties     ← Produktion (Env-Variablen)
-├── Dockerfile
-├── docker-compose.yml
-└── .env.template
+├── Dockerfile                          ← Multi-Stage Build
+├── docker-compose.yml                  ← App + PostgreSQL
+└── .env.template                       ← Vorlage für Passwörter
 ```
 
 ---
@@ -342,7 +357,7 @@ klassenbuch-api/
 ## Tests ausführen
 
 ```bash
-# Alle Tests (kein Server oder DB nötig):
+# Alle Tests (kein laufender Server oder DB nötig):
 ./mvnw test
 ```
 
