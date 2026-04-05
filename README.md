@@ -113,6 +113,19 @@ docker compose -f docker-compose.full.yml logs -f app
 # Logs DB:
 docker compose -f docker-compose.full.yml logs -f db
 
+# Dump von Docker container
+docker compose -f docker-compose.full.yml exec -T db \
+  pg_dump -U postgres -d klassenbuch -F c \
+  > /var/backups/klassenbuch_$(date +\%F).dump # gib deine path
+
+oder von adere host durch SSH
+ssh user@remote-host "docker compose -f docker-compose.full.yml exec -T db pg_dump -U postgres -d klassenbuch -F c" > ./local_klassenbuch$(date +%F).dump
+
+# Dump in Docker importieren:
+docker compose -f docker-compose.full.yml exec -T db \
+  pg_restore -U postgres -d klassenbuch --no-owner \
+  < klassenbuch_backup.dump
+
 # Stoppen (Daten bleiben erhalten):
 docker compose -f docker-compose.full.yml down
 
