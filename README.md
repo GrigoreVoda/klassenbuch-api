@@ -113,6 +113,9 @@ docker compose -f docker-compose.full.yml logs -f app
 # Logs DB:
 docker compose -f docker-compose.full.yml logs -f db
 
+# Mit sql konatainer interaktiv verbinden
+docker compose -f docker-compose.full.yml exec -it db psql -U postgres
+
 # Dump von Docker container
 docker compose -f docker-compose.full.yml exec -T db \
   pg_dump -U postgres -d klassenbuch -F c \
